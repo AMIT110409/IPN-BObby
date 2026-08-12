@@ -1,18 +1,29 @@
 """
-Bobby — Settings (Dual Config: Supabase demo / Azure production)
-================================================================
+Bobby — Settings (Multi-provider LLM + Dual DB Config)
+========================================================
 Usage:
-  from config.settings import settings
+  from config.settings import settings, LLMProvider
 
-  # Access config:
-  settings.openai_api_key
-  settings.freshdesk_domain
-  settings.is_demo   # True if APP_ENV=demo
+  # Check which LLM is active:
+  settings.llm_provider          # LLMProvider.CLAUDE | .OPENAI | .AZURE_OPENAI
+  settings.anthropic_api_key     # Claude API key
+  settings.is_demo               # True if APP_ENV=demo
+
+LLM_PROVIDER values:
+  claude       → Anthropic Claude (default)
+  openai       → OpenAI GPT
+  azure_openai → Azure OpenAI (production)
 """
 from __future__ import annotations
 from enum import Enum
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LLMProvider(str, Enum):
+    CLAUDE      = "claude"
+    OPENAI      = "openai"
+    AZURE_OPENAI = "azure_openai"
 
 
 class AppEnv(str, Enum):
@@ -36,12 +47,21 @@ class Settings(BaseSettings):
     api_secret_key: str = "change-me-in-production"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
-    # ── LLM — Demo (OpenAI direct) ────────────────────────────────────────────
-    openai_api_key: str = ""
+    # ── LLM Provider Selection ────────────────────────────────────────────────
+    # Options: "claude" | "openai" | "azure_openai"
+    # Default: claude (Anthropic) — change in .env to switch provider
+    llm_provider: LLMProvider = LLMProvider.CLAUDE
+
+    # ── Claude / Anthropic ───────────────────────────────────────────────────
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-3-5-sonnet-20241022"   # latest Sonnet
+
+    # ── OpenAI (direct) ───────────────────────────────────────────────────────
+    openai_api_key: str = ""   # also used as embedding fallback when provider=claude
     openai_model: str = "gpt-4o"
     openai_embedding_model: str = "text-embedding-3-small"
 
-    # ── LLM — Production (Azure OpenAI) ──────────────────────────────────────
+    # ── Azure OpenAI ─────────────────────────────────────────────────────────
     azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""
     azure_openai_deployment: str = "gpt-4o"
@@ -109,11 +129,23 @@ class Settings(BaseSettings):
 
     @property
     def llm_api_key(self) -> str:
-        return self.openai_api_key if self.is_demo else self.azure_openai_api_key
+        """Returns the active API key for the configured LLM provider."""
+        from config.settings import LLMProvider
+        if self.llm_provider == LLMProvider.CLAUDE:
+            return self.anthropic_api_key
+        if self.llm_provider == LLMProvider.OPENAI:
+            return self.openai_api_key
+        return self.azure_openai_api_key
 
     @property
     def llm_model(self) -> str:
-        return self.openai_model if self.is_demo else self.azure_openai_deployment
+        """Returns the active model name for the configured LLM provider."""
+        from config.settings import LLMProvider
+        if self.llm_provider == LLMProvider.CLAUDE:
+            return self.anthropic_model
+        if self.llm_provider == LLMProvider.OPENAI:
+            return self.openai_model
+        return self.azure_openai_deployment
 
 
 @lru_cache

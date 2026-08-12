@@ -40,6 +40,39 @@ What was decided?
 
 ---
 
+## [DEC-011] Multi-provider LLM: Claude as default, OpenAI and Azure OpenAI as alternatives
+**Date:** 2026-08-12  
+**Status:** Accepted  
+**Decided by:** Manager
+
+### Context
+Originally OpenAI was the planned LLM. Manager changed direction to Anthropic Claude API for the demo. However the system should still support OpenAI and Azure OpenAI without code changes.
+
+### Decision
+Added `LLM_PROVIDER` env var (values: `claude` | `openai` | `azure_openai`).  
+Default is `claude`. Switching provider requires only a `.env` change — zero code changes in nodes or business logic.
+
+Implementation:
+- `LLMProvider` enum added to `settings.py`
+- `get_llm()` in `llm_client.py` is a factory function that reads `LLM_PROVIDER` and returns the correct LangChain `BaseChatModel`
+- All nodes call `get_llm()` — fully decoupled from provider
+- `langchain-anthropic` added to `requirements.txt`
+
+### Embedding note
+Claude does not provide an embeddings API. When `LLM_PROVIDER=claude`, embeddings fall back to OpenAI (`OPENAI_API_KEY` still required for vector search / RAG). In production with `LLM_PROVIDER=azure_openai`, Azure OpenAI embeddings are used.
+
+### Alternatives Considered
+- Hard-code Claude: Simpler but blocks future provider switch without code changes
+- Use LiteLLM as universal proxy: Adds a dependency and learning curve; overkill for 3 providers
+
+### Consequences
+- ✅ Provider is a config value, not a code decision
+- ✅ Demo uses Claude; production uses Azure OpenAI — same codebase
+- ⚠️ `OPENAI_API_KEY` still required for embeddings even when `LLM_PROVIDER=claude`
+- ⚠️ JSON mode (structured extraction) works differently between Claude and OpenAI — handled in `get_llm()` transparently
+
+---
+
 ## [DEC-010] Use MemorySaver for Phase 1 demo; migrate to PostgresSaver for production
 **Date:** 2026-08-12  
 **Status:** Accepted  
