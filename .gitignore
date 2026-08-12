@@ -38,7 +38,13 @@ Thumbs.db
 # ─── Docker ────────────────────────────────────────────
 *.override.yml
 
-# ─── Secrets (never commit) ────────────────────────────
+# ─── Secrets / Credentials (NEVER commit) ─────────────────────────────────────
 *.pem
 *.key
 secrets/
+
+# Actual env files with real credentials (only .env.example is committed)
+.env
+.env.local
+frontend/.env.local
+backend/.env
