@@ -8,7 +8,7 @@ Rule: All nodes READ from state, return UPDATED state fields only.
       Never mutate state directly — always return a dict of changes.
 """
 from __future__ import annotations
-from typing import Annotated, TypedDict
+from typing import Optional, Annotated, TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
@@ -27,7 +27,8 @@ class TicketState(TypedDict):
     contact_name: str | None        # full name provided by user in chat
     contact_email: str | None       # email for ticket notifications
     contact_phone: str | None       # phone/mobile number
-    contact_info_collected: bool    # True once all 3 fields are gathered
+    contact_info_collected: bool
+    user_time_greeting: Optional[str]    # True once all 3 fields are gathered
 
     # ── Triage output ─────────────────────────────────────────────────────────
     intent: str             # "it_question" | "create_ticket" | "ticket_status"

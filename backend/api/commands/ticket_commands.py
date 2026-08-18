@@ -72,6 +72,8 @@ class ChatRequest(BaseModel):
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
+    local_time_greeting: Optional[str] = None
+    local_hour: Optional[int] = None
 
 
 class ResumeApprovalRequest(BaseModel):
@@ -145,6 +147,7 @@ async def chat(
         "contact_name": sess.get("contact_name"),
         "contact_email": sess.get("contact_email"),
         "contact_phone": sess.get("contact_phone"),
+        "user_time_greeting": request.local_time_greeting,
         "contact_info_collected": _all_collected(sess),
         "escalated": False,
         "needs_human_approval": False,

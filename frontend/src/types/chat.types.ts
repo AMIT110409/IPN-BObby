@@ -41,10 +41,14 @@ export interface TicketCardData {
 export interface ChatRequest {
   message: string;
   session_id: string;
+  local_time_greeting?: string;
+  local_hour?: number;
 }
 
 export interface ChatResponse {
   session_id: string;
+  local_time_greeting?: string;
+  local_hour?: number;
   message: string;
   intent?: string;
   escalated?: boolean;
@@ -54,6 +58,8 @@ export interface ChatResponse {
 
 export interface ApprovalRequest {
   session_id: string;
+  local_time_greeting?: string;
+  local_hour?: number;
   approved: boolean;
 }
 

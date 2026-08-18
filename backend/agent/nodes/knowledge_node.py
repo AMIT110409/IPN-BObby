@@ -22,8 +22,14 @@ Knowledge Base Context:
 """
 
 
-def _get_time_aware_greeting(user_query: str = "") -> str:
-    """Returns time-sensitive greeting based on user query or real-time clock."""
+def _get_time_aware_greeting(user_query: str = "", user_time_greeting: str = None) -> str:
+    """Returns time-sensitive greeting based on client local time or query context."""
+    if user_time_greeting and user_time_greeting.strip():
+        clean_g = user_time_greeting.strip().capitalize()
+        if not clean_g.endswith("!"):
+            clean_g += "!"
+        return clean_g
+
     q_lower = user_query.lower()
     if "good afternoon" in q_lower or "afternoon" in q_lower:
         return "Good afternoon!"
@@ -32,6 +38,7 @@ def _get_time_aware_greeting(user_query: str = "") -> str:
     if "good morning" in q_lower or "morning" in q_lower:
         return "Good morning!"
 
+    # Fallback to local machine clock
     hour = datetime.datetime.now().hour
     if 5 <= hour < 12:
         return "Good morning!"
@@ -114,7 +121,7 @@ async def knowledge_node(state: TicketState) -> dict:
     # 3. Dynamic Greetings
     is_greeting = q_lower in ("hi", "hello", "hey", "good morning", "good afternoon", "good evening", "hi bobby", "hello bobby", "hey bobby") or any(q_lower.startswith(g) for g in ("hi ", "hello ", "hey ", "good morning", "good afternoon", "good evening"))
     if is_greeting:
-        time_g = _get_time_aware_greeting(user_query)
+        time_g = _get_time_aware_greeting(user_query, state.get('user_time_greeting'))
         msg = (
             f"👋 **{time_g}** I'm **Bobby**, your IT Support Assistant at Inspired Pet Nutrition.\n\n"
             "I'm here 24/7 to help you stay productive. Here's what I can do:\n\n"

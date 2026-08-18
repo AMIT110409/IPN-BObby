@@ -38,9 +38,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((s) => ({ messages: [...s.messages, userMsg], isLoading: true }));
 
     try {
+      const currentHour = new Date().getHours();
+      const clientGreeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening';
+
       const response = await chatService.sendMessage({
         message: content,
         session_id: sessionId,
+        local_time_greeting: clientGreeting,
+        local_hour: currentHour,
       });
 
       const bobbyMsg: Message = {
