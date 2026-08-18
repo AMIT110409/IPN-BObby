@@ -34,11 +34,21 @@ _GREETINGS = {
 }
 
 _BAD_INTENT_PATTERNS = [
-    r"\b(ignore previous instructions|system prompt|jailbreak|disregard all|bypass filter)\b",
-    r"\b(hack|exploit|malware|ddos|sql injection|drop table|steal password)\b",
-    r"\b(fuck|shit|bitch|bastard|idiot|stupid bot|asshole|shut up)\b",
-    r"\b(kill myself|suicide|self harm|hurt myself)\b",
-    r"\b(recipe for|who won the match|weather in|movie review|write a poem about love)\b",
+    # 1. Prompt injection / Jailbreak
+    r"\b(ignore previous instructions|system prompt|jailbreak|disregard all|bypass filter|developer mode|dan mode)\b",
+    # 2. Hacking & Malware
+    r"\b(hack|exploit|malware|ddos|sql injection|drop table|steal password|keylogger|ransomware)\b",
+    # 3. Profanity & Toxicity
+    r"\b(fuck|shit|bitch|bastard|idiot|stupid bot|asshole|shut up|cunt|dick)\b",
+    # 4. Self-harm & Harm
+    r"\b(kill myself|suicide|self harm|hurt myself|bomb|weapon)\b",
+    # 5. Non-IT Lost/Stolen Personal Belongings (Out-of-Scope)
+    r"\b(stolen|lost|missing|forgot|left|dropped)\s+(my\s+)?(shoes?|sneakers?|boots?|slippers?|socks?|clothes?|clothing|jacket|coat|shirt|pants|jeans|dress|hat|cap|wallet|purse|handbag|backpack|bag|money|cash|credit card|watch|jewelry|ring|necklace|sunglasses|glasses|umbrella|keys?|house keys?|car keys?|car|bike|bicycle|scooter|lunch|lunchbox|water bottle|tumbler|food|groceries|dog|cat|pet)\b",
+    r"\b(shoes?|sneakers?|boots?|slippers?|socks?|jacket|coat|shirt|pants|jeans|dress|hat|wallet|purse|handbag|backpack|jewelry|necklace|sunglasses|umbrella|car keys?|bicycle|lunchbox|water bottle)\b",
+    # 6. Non-IT Lifestyle, Travel, Food & Consumer Services (Out-of-Scope)
+    r"\b(recipe for|who won the match|weather in|weather today|movie review|write a poem|book\s+(a\s+)?flight|book\s+(a\s+)?hotel|flight ticket|vacation plan|order\s+(a\s+)?pizza|order\s+(some\s+)?food|order\s+(a\s+)?coffee|restaurant recommendation|dating advice|horoscope|astrology|sports score|cricket score|football score|video game cheat)\b",
+    # 7. Non-IT Facility, Medical, Legal & HR Personal Complaints
+    r"\b(plumbing|toilet|restroom|janitor|cleaning service|ac too cold|air conditioning|car park|parking space|cafeteria food|medical advice|prescription|legal lawsuit|tax advice)\b",
 ]
 
 _AMBIGUOUS_PHRASES = {

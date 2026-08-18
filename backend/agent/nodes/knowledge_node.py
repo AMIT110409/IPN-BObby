@@ -78,14 +78,15 @@ async def knowledge_node(state: TicketState) -> dict:
     # 1. Guardrail Refusal
     if intent == "guardrail_refusal":
         msg = (
-            "I wasn't able to process that request as it falls outside the scope of IT Support.\n\n"
-            "I can help you with:\n"
-            "• Password resets & account unlocks\n"
-            "• VPN, Wi-Fi & network connectivity issues\n"
-            "• Microsoft 365, Teams & Outlook support\n"
-            "• Hardware & software requests\n"
-            "• IT support ticket management\n\n"
-            "Could you please **rephrase your request** with your specific IT issue?"
+            "🛡️ **Out of Scope Request**\n\n"
+            "I am Bobby, the AI Service Management Assistant at Inspired Pet Nutrition, dedicated strictly to **IT Systems and Technical Support**.\n\n"
+            "I cannot assist with personal belongings, non-IT matters, or facility requests. However, I am ready to help you with:\n\n"
+            "• 🔑 **Account & Access:** Password resets, MFA token resets & domain unlocks\n"
+            "• 🌐 **Network & Connectivity:** Corporate VPN, Wi-Fi 802.1X & DNS issues\n"
+            "• 💻 **Workplace Hardware:** Laptops, 4K monitors, docking stations & accessories\n"
+            "• 📊 **Enterprise Software:** Microsoft 365, Teams, Outlook & Dynamics 365 ERP\n"
+            "• 🎫 **ITSM Ticketing:** Raising, tracking, and resolving IT service requests\n\n"
+            "👉 *Please rephrase your request with your specific IT or workplace technology issue.*"
         )
         return {"retrieved_docs": [], "knowledge_answer": msg, "final_response": msg}
 
