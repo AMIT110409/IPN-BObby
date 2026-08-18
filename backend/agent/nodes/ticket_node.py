@@ -193,6 +193,30 @@ async def ticket_node(state: TicketState) -> dict:
     if intent == "ticket_status":
         try:
             freshdesk = get_freshdesk_client()
+            id_match = re.search(r"#?(\d{2,8})", user_message)
+            if id_match:
+                spec_id = id_match.group(1)
+                try:
+                    t = await freshdesk.get_ticket(spec_id)
+                    status_map = {2: "Open", 3: "Pending", 4: "Resolved", 5: "Closed"}
+                    status_str = status_map.get(t.get("status"), str(t.get("status", "In Progress")))
+                    priority_map = {1: "🟢 Low", 2: "🟡 Medium", 3: "🟠 High", 4: "🔴 Urgent (P1)"}
+                    priority_str = priority_map.get(t.get("priority"), "Medium")
+
+                    return {
+                        "ticket_details": {"ticket": t},
+                        "final_response": (
+                            f"🎫 **Ticket #{spec_id} Details**\n\n"
+                            f"• **Subject:** {t.get('subject')}\n"
+                            f"• **Status:** *{status_str}*\n"
+                            f"• **Priority:** {priority_str}\n"
+                            f"• **Created:** {t.get('created_at', '')[:10]}\n\n"
+                            f"🤝 *Need to add details or escalate this ticket?*"
+                        ),
+                    }
+                except Exception:
+                    pass
+
             tickets = await freshdesk.get_tickets_by_user(state["user_id"])
             if tickets:
                 ticket_summary = "\n".join([
