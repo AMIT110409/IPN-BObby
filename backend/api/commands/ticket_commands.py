@@ -108,15 +108,22 @@ async def chat(
             _, q = CONTACT_STEPS[0]
             return {
                 "session_id": request.session_id,
-                "message": q,
+                "message": f"📝 **Contact Verification**\n\n{q}",
                 "intent": "create_ticket",
                 "contact_info": {"name": None, "email": None, "phone": None, "collected": False},
             }
         else:
             sess["awaiting_confirmation"] = False
 
-    # Phase 2: Collecting contact info
-    if sess.get("collecting_contact") and not _all_collected(sess):
+    # Check if user message is an explicit ticket creation request
+    is_ticket_intent = any(t in msg_lower for t in (
+        "create ticket", "raise ticket", "log ticket", "open ticket", "submit ticket",
+        "create a ticket", "raise a ticket", "log a ticket", "open a ticket", "new ticket",
+        "ticket for", "create account", "onboard", "hardware request"
+    ))
+
+    # Phase 2: Contact Collection State Machine
+    if sess.get("collecting_contact"):
         _fill_step(sess, msg)
         if not _all_collected(sess):
             step_idx = sess.get("current_step", 0)
@@ -124,7 +131,7 @@ async def chat(
                 _, next_q = CONTACT_STEPS[step_idx]
                 return {
                     "session_id": request.session_id,
-                    "message": next_q,
+                    "message": f"📝 **Contact Verification**\n\n{next_q}",
                     "intent": "create_ticket",
                     "contact_info": {
                         "name": sess.get("contact_name"),
@@ -133,8 +140,48 @@ async def chat(
                         "collected": False,
                     },
                 }
+        else:
+            # All 3 fields (Name, Email, Phone) collected! Resume ticket creation
+            sess["collecting_contact"] = False
+            if sess.get("pending_ticket_query"):
+                msg = sess["pending_ticket_query"]
+                msg_lower = msg.lower()
+                sess["pending_ticket_query"] = None
+
+    elif is_ticket_intent and not _all_collected(sess):
+        # Auto-extract if provided in one-shot text (e.g. "My name is Mark, email mark@ipn.co.uk")
+        em = _EMAIL_RE.search(msg)
+        if em:
+            sess["contact_email"] = em.group(0)
+        pm = _PHONE_RE.search(msg)
+        if pm and any(c.isdigit() for c in pm.group(0)) and len(pm.group(0).strip()) >= 7:
+            sess["contact_phone"] = pm.group(0).strip()
+
+        if not _all_collected(sess):
+            sess["pending_ticket_query"] = msg
+            sess["collecting_contact"] = True
+            sess["current_step"] = 0
+            if sess.get("contact_name"):
+                sess["current_step"] = 1
+            if sess.get("contact_name") and sess.get("contact_email"):
+                sess["current_step"] = 2
+
+            step_idx = sess.get("current_step", 0)
+            _, next_q = CONTACT_STEPS[step_idx]
+            return {
+                "session_id": request.session_id,
+                "message": f"📝 **Contact Verification**\n\n{next_q}",
+                "intent": "create_ticket",
+                "contact_info": {
+                    "name": sess.get("contact_name"),
+                    "email": sess.get("contact_email"),
+                    "phone": sess.get("contact_phone"),
+                    "collected": False,
+                },
+            }
 
     # Phase 3: Route via LangGraph
+    logger.info("chat.routing_to_graph", msg=msg, all_collected=_all_collected(sess), sess=sess)
     graph = get_bobby_graph()
     config = {"configurable": {"thread_id": request.session_id}}
 
@@ -182,18 +229,13 @@ async def chat(
             },
         }
 
-        try:
-            state_snapshot = await graph.aget_state(config)
-            if state_snapshot and state_snapshot.next and "hitl_node" in state_snapshot.next:
-                pending = result.get("pending_action", {})
-                response["requires_approval"] = True
-                response["pending_action"] = pending
-                # Use final_response as the display message (it has the formatted draft card)
-                # Only fall back to pending_action message if final_response is empty
-                if not bot_message:
-                    response["message"] = pending.get("message", "Bobby is preparing your ticket request.")
-        except Exception:
-            pass
+        # Extract pending approval directly from graph execution result
+        if result.get("needs_human_approval") or result.get("pending_action"):
+            pending = result.get("pending_action", {})
+            response["requires_approval"] = True
+            response["pending_action"] = pending
+            if not bot_message:
+                response["message"] = pending.get("message", "Bobby is preparing your ticket request.")
 
         return response
 

@@ -208,8 +208,14 @@ export default function Layout({ children }: Props) {
                 </div>
               )}
 
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
+              {messages.map((msg, index) => (
+                <MessageBubble 
+                  key={msg.id} 
+                  message={msg} 
+                  isLatest={index === messages.length - 1}
+                  onApprove={(editedData) => approveAction(true, editedData)}
+                  onReject={() => approveAction(false)}
+                />
               ))}
 
               {isLoading && <TypingIndicator />}
