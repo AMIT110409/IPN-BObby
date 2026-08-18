@@ -117,35 +117,35 @@ def _format_draft_card(ticket: dict, ticket_number: str = None) -> str:
         "low": "🟢 Low",
         "medium": "🟡 Medium",
         "high": "🟠 High",
-        "urgent": "🔴 Urgent",
+        "urgent": "🔴 Urgent (P1)",
     }
     category_icons = {
-        "IT": "💻 IT",
-        "HR": "👥 HR",
-        "Finance": "💰 Finance",
-        "General": "📋 General",
+        "IT": "💻 Workplace & Hardware",
+        "Workplace & Hardware": "💻 Workplace & Hardware",
+        "Network & Infrastructure": "🌐 Network & Connectivity",
+        "Identity & Access": "🔑 Identity & Access Management",
+        "Cybersecurity": "🛡️ Cybersecurity & Auth",
+        "Enterprise Applications": "📊 Enterprise Applications",
+        "HR": "👥 HR & People Operations",
+        "Finance": "💳 Finance & Billing",
+        "General": "📋 IT Support",
     }
-    p_display = priority_icons.get(ticket.get("priority", "medium"), "🟡 Medium")
-    c_display = category_icons.get(ticket.get("category", "IT"), "💻 IT")
+    p_display = priority_icons.get(ticket.get("priority", "medium").lower(), "🟡 Medium")
+    c_display = category_icons.get(ticket.get("category", "IT"), f"💻 {ticket.get('category', 'IT')}")
+    subj = ticket.get('subject', 'IT Support Request')
+    desc = ticket.get('description', '').split('\n')[0].strip()
 
-    header = f"📝 **Ticket Draft #{ticket_number}**" if ticket_number else "📝 **Ticket Draft — Please Review**"
+    header = f"📋 **Ticket Draft #{ticket_number}**" if ticket_number else "📋 **Ticket Draft — Please Review**"
 
-    lines = [
-        header,
-        "",
-        "| Field | Value |",
-        "|---|---|",
-        f"| **Subject** | {ticket.get('subject', 'IT Support Request')} |",
-        f"| **Category** | {c_display} |",
-        f"| **Priority** | {p_display} |",
-        "",
-        "**Description:**",
-        f"> {ticket.get('description', '').split(chr(10))[0]}",
-        "",
-        "---",
-        "Please review the details above. You can click **Confirm & Submit** or **Edit Details** before submitting.",
-    ]
-    return "\n".join(lines)
+    return (
+        f"{header}\n\n"
+        f"• **Subject:** {subj}\n"
+        f"• **Category:** {c_display}\n"
+        f"• **Priority:** {p_display}\n\n"
+        f"**Description:**\n> {desc}\n\n"
+        f"---\n"
+        f"👉 *Review the details below. Click **Confirm & Submit** to assign a specialist, or **Edit Details** to customize.*"
+    )
 
 
 async def ticket_node(state: TicketState) -> dict:

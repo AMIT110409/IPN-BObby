@@ -327,15 +327,15 @@ async def resume_approval(
                 p_icon = priority_icons.get(priority.lower(), "🟡")
 
                 response_text = (
-                    f"✅ **Ticket #{new_id} created successfully!**\n\n"
-                    f"**{subject}**\n\n"
-                    f"| Field | Detail |\n|---|---|\n"
-                    f"| 🎫 **Ticket ID** | #{new_id} |\n"
-                    f"| {p_icon} **Priority** | {priority.title()} |\n"
-                    f"| 👤 **Assigned to** | {assigned_specialist} — {assigned_team} |\n"
-                    f"| ⚡ **Status** | In Progress (Autonomous Resolver Agent active) |\n"
-                    f"| 📧 **Updates** | Confirmation sent to {target_email} |\n\n"
-                    f"🤖 *Our Autonomous IT Resolution Agent is processing this request. You will receive a resolution confirmation email shortly.*"
+                    f"🎉 **Ticket #{new_id} Created Successfully!**\n\n"
+                    f"• **Subject:** {subject}\n"
+                    f"• **Priority:** {p_icon} {priority.title()}\n"
+                    f"• **Assigned Specialist:** {assigned_specialist} ({assigned_team})\n"
+                    f"• **Requester:** {recipient_name} (`{target_email}`)\n"
+                    f"• **Status:** ⚡ In Progress (Autonomous Domain Specialist Active)\n\n"
+                    f"📧 *A full confirmation email and private audit note have been dispatched to **{target_email}**.*\n\n"
+                    f"---\n"
+                    f"🤝 **Is there anything else I can help you with today?**"
                 )
 
                 return {

@@ -2,7 +2,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  max-width: 85%;
+  max-width: 90%;
   margin-bottom: 8px;
 }
 
@@ -30,16 +30,17 @@
   font-weight: 700;
   flex-shrink: 0;
   margin-top: 2px;
-  box-shadow: 0 2px 5px rgba(0, 71, 60, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 71, 60, 0.15);
 }
 
 .bubble {
-  padding: 10px 14px;
+  padding: 12px 15px;
   border-radius: 16px;
-  font-size: 13.5px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.5;
   position: relative;
   word-break: break-word;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .bubbleUser {
@@ -55,21 +56,73 @@
   border-bottom-left-radius: 4px;
 }
 
-.bubble p {
-  margin: 0 0 4px;
+.markdownContent p {
+  margin: 0 0 6px;
 }
 
-.bubble p:last-of-type {
+.markdownContent p:last-child {
   margin-bottom: 0;
 }
 
-.bubble strong {
+.markdownContent strong {
   font-weight: 700;
+  color: inherit;
 }
 
-.bubble ul, .bubble ol {
-  padding-left: 16px;
-  margin: 4px 0;
+.markdownContent ul, .markdownContent ol {
+  padding-left: 18px;
+  margin: 6px 0;
+}
+
+.markdownContent li {
+  margin-bottom: 3px;
+}
+
+.markdownContent blockquote {
+  border-left: 3px solid #00473C;
+  padding: 4px 10px;
+  margin: 6px 0;
+  background: rgba(0, 71, 60, 0.05);
+  border-radius: 0 6px 6px 0;
+  color: #2d3748;
+  font-size: 12.5px;
+}
+
+.markdownContent table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.markdownContent th, .markdownContent td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.markdownContent th {
+  background: #edf2f7;
+  font-weight: 700;
+  color: #4a5568;
+}
+
+.markdownContent hr {
+  border: none;
+  border-top: 1px dashed #cbd5e1;
+  margin: 8px 0;
+}
+
+.markdownContent code {
+  background: rgba(0, 71, 60, 0.08);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: monospace;
 }
 
 .intentTag {
@@ -88,19 +141,21 @@
 
 .timestamp {
   display: block;
-  font-size: 9px;
+  font-size: 9.5px;
   color: #a0aec0;
-  margin-top: 4px;
+  margin-top: 5px;
   text-align: right;
 }
 
 .system {
   align-self: center;
-  font-size: 11px;
-  color: #718096;
-  background: #ffffff;
-  border: 1px solid #eae6db;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #4a5568;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
   border-radius: 12px;
-  padding: 4px 12px;
-  margin: 8px 0;
+  padding: 5px 14px;
+  margin: 8px auto;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }

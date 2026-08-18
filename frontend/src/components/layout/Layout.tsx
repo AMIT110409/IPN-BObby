@@ -222,6 +222,37 @@ export default function Layout({ children }: Props) {
                 />
               )}
 
+              {/* Post-Resolution / Wrap-up Quick Actions */}
+              {!isLoading && !pendingAction && messages.length > 0 && 
+                messages[messages.length - 1].sender === 'bobby' && 
+                (messages[messages.length - 1].content.includes("anything else") || 
+                 messages[messages.length - 1].content.includes("Created Successfully") ||
+                 messages[messages.length - 1].content.includes("Resolved")) && (
+                <div className={styles.wrapUpActions}>
+                  <p className={styles.wrapUpTitle}>Next Steps:</p>
+                  <div className={styles.wrapUpButtons}>
+                    <button 
+                      className={styles.wrapUpBtn}
+                      onClick={() => sendMessage("What is the status of my ticket?")}
+                    >
+                      🎫 Check Ticket Status
+                    </button>
+                    <button 
+                      className={styles.wrapUpBtn}
+                      onClick={() => sendMessage("I have another IT question")}
+                    >
+                      ❓ Ask Another Question
+                    </button>
+                    <button 
+                      className={styles.wrapUpBtnReset}
+                      onClick={() => setIsChatOpen(false)}
+                    >
+                      ❌ Close Chat
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div ref={chatBottomRef} />
             </div>
 
