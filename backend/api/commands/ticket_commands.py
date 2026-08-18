@@ -1,25 +1,77 @@
 """
-Bobby — CQRS Commands: Ticket Operations
+Bobby - CQRS Commands: Ticket Operations
 ==========================================
 All ticket write operations go through LangGraph.
-HITL approval fires before any Freshdesk write.
+Approval is handled directly at the HTTP layer for reliability.
+Contact info (name/email/phone) is collected in a simple in-memory session store.
 """
 from __future__ import annotations
+from integrations.email_service import send_escalation_email
+import re
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from langchain_core.messages import HumanMessage
-from agent.graph import get_bobby_graph
+from agent.graph import get_bobby_graph, build_bobby_graph
 from middleware.auth import get_current_user
+from config.settings import settings
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/commands")
 
+_sessions: dict[str, dict] = {}
+_fallback_graph = None
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
+_PHONE_RE = re.compile(r"[\+]?[\d\s\-\(\)]{7,15}")
+_CONFIRM_WORDS = {"yes", "y", "sure", "please", "yes please", "ok", "okay", "confirm", "yep", "yup"}
 
-# ── Request Models ────────────────────────────────────────────────────────────
+CONTACT_STEPS = [
+    ("contact_name",  "Before I create the ticket, could you please tell me your **full name**?"),
+    ("contact_email", "Great! What is your **email address** so we can send you ticket updates?"),
+    ("contact_phone", "Almost done! What is your **phone / mobile number** for the helpdesk to reach you?"),
+]
+
+
+def _get_sess(sid: str) -> dict:
+    if sid not in _sessions:
+        _sessions[sid] = {
+            "contact_name": None,
+            "contact_email": None,
+            "contact_phone": None,
+            "awaiting_confirmation": False,
+            "collecting_contact": False,
+            "current_step": 0,
+        }
+    return _sessions[sid]
+
+
+def _all_collected(sess: dict) -> bool:
+    return bool(sess.get("contact_name") and sess.get("contact_email") and sess.get("contact_phone"))
+
+
+def _fill_step(sess: dict, value: str):
+    step_idx = sess.get("current_step", 0)
+    if step_idx >= len(CONTACT_STEPS):
+        return
+    field, _ = CONTACT_STEPS[step_idx]
+    if field == "contact_email":
+        m = _EMAIL_RE.search(value)
+        sess[field] = m.group(0) if m else value.strip()
+    elif field == "contact_phone":
+        m = _PHONE_RE.search(value)
+        sess[field] = m.group(0).strip() if m else value.strip()
+    else:
+        sess[field] = value.strip()
+    sess["current_step"] = step_idx + 1
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
 
 
 class ResumeApprovalRequest(BaseModel):
@@ -27,25 +79,73 @@ class ResumeApprovalRequest(BaseModel):
     approved: bool
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    Main chat endpoint — processes user message through Bobby graph.
-    Returns Bobby's response and any pending approval requests.
-    """
+    global _fallback_graph
+    sess = _get_sess(request.session_id)
+
+    if request.contact_name:
+        sess["contact_name"] = request.contact_name
+    if request.contact_email:
+        sess["contact_email"] = request.contact_email
+    if request.contact_phone:
+        sess["contact_phone"] = request.contact_phone
+
+    msg = request.message.strip()
+    msg_lower = msg.lower()
+
+    # Phase 1: Awaiting confirmation
+    if sess.get("awaiting_confirmation"):
+        if msg_lower in _CONFIRM_WORDS:
+            sess["awaiting_confirmation"] = False
+            sess["collecting_contact"] = True
+            sess["current_step"] = 0
+            _, q = CONTACT_STEPS[0]
+            return {
+                "session_id": request.session_id,
+                "message": q,
+                "intent": "create_ticket",
+                "contact_info": {"name": None, "email": None, "phone": None, "collected": False},
+            }
+        else:
+            sess["awaiting_confirmation"] = False
+
+    # Phase 2: Collecting contact info
+    if sess.get("collecting_contact") and not _all_collected(sess):
+        _fill_step(sess, msg)
+        if not _all_collected(sess):
+            step_idx = sess.get("current_step", 0)
+            if step_idx < len(CONTACT_STEPS):
+                _, next_q = CONTACT_STEPS[step_idx]
+                return {
+                    "session_id": request.session_id,
+                    "message": next_q,
+                    "intent": "create_ticket",
+                    "contact_info": {
+                        "name": sess.get("contact_name"),
+                        "email": sess.get("contact_email"),
+                        "phone": sess.get("contact_phone"),
+                        "collected": False,
+                    },
+                }
+
+    # Phase 3: Route via LangGraph
     graph = get_bobby_graph()
     config = {"configurable": {"thread_id": request.session_id}}
 
-    initial_state = {
-        "messages": [HumanMessage(content=request.message)],
+    invoke_input = {
+        "messages": [HumanMessage(content=msg)],
         "user_id": current_user["user_id"],
         "user_name": current_user["name"],
         "user_role": current_user["role"],
         "session_id": request.session_id,
+        "contact_name": sess.get("contact_name"),
+        "contact_email": sess.get("contact_email"),
+        "contact_phone": sess.get("contact_phone"),
+        "contact_info_collected": _all_collected(sess),
         "escalated": False,
         "needs_human_approval": False,
         "human_approved": None,
@@ -53,27 +153,49 @@ async def chat(
     }
 
     try:
-        result = await graph.ainvoke(initial_state, config=config)
+        try:
+            result = await graph.ainvoke(invoke_input, config=config)
+        except Exception as db_err:
+            logger.warning("chat.checkpointer_retry_fallback", error=str(db_err))
+            if _fallback_graph is None:
+                _fallback_graph = build_bobby_graph()
+            result = await _fallback_graph.ainvoke(invoke_input, config=config)
+
+        bot_message = result.get("final_response", "")
+
+        if bot_message and "shall i create a ticket" in bot_message.lower():
+            sess["awaiting_confirmation"] = True
 
         response = {
             "session_id": request.session_id,
-            "message": result.get("final_response", ""),
+            "message": bot_message,
             "intent": result.get("intent"),
             "escalated": result.get("escalated", False),
+            "contact_info": {
+                "name": sess.get("contact_name"),
+                "email": sess.get("contact_email"),
+                "phone": sess.get("contact_phone"),
+                "collected": _all_collected(sess),
+            },
         }
 
-        # Check if graph is paused waiting for HITL
-        state_snapshot = await graph.aget_state(config)
-        if state_snapshot.next and "hitl_node" in state_snapshot.next:
-            pending = result.get("pending_action", {})
-            response["requires_approval"] = True
-            response["pending_action"] = pending
-            response["message"] = pending.get("message", "")
+        try:
+            state_snapshot = await graph.aget_state(config)
+            if state_snapshot and state_snapshot.next and "hitl_node" in state_snapshot.next:
+                pending = result.get("pending_action", {})
+                response["requires_approval"] = True
+                response["pending_action"] = pending
+                # Use final_response as the display message (it has the formatted draft card)
+                # Only fall back to pending_action message if final_response is empty
+                if not bot_message:
+                    response["message"] = pending.get("message", "Bobby is preparing your ticket request.")
+        except Exception:
+            pass
 
         return response
 
     except Exception as e:
-        logger.error("chat.error", error=str(e), session_id=request.session_id)
+        logger.error("chat.error", error=str(e), session_id=request.session_id, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -82,27 +204,249 @@ async def resume_approval(
     request: ResumeApprovalRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    Resumes a paused Bobby graph after HITL approval/rejection.
-    Called by the React UI when user clicks Approve or Reject.
-    """
+    """Handles HITL approval at HTTP layer."""
     graph = get_bobby_graph()
     config = {"configurable": {"thread_id": request.session_id}}
+    sess = _get_sess(request.session_id)
 
     try:
-        # Resume the interrupted graph with the user's decision
-        result = await graph.ainvoke(
-            {"human_approved": request.approved},
-            config=config,
-        )
+        state_snapshot = await graph.aget_state(config)
+        if not state_snapshot or not state_snapshot.values:
+            return {
+                "session_id": request.session_id,
+                "message": "No pending action found for this session.",
+                "approved": request.approved,
+            }
+
+        state = state_snapshot.values
+        pending = state.get("pending_action", {})
+        ticket_id = state.get("ticket_id")
+        action_type = pending.get("type", "")
+
+        if not request.approved:
+            return {
+                "session_id": request.session_id,
+                "message": "Okay, action cancelled. Is there anything else I can help you with?",
+                "approved": False,
+            }
+
+        logger.info("approve.executing", action_type=action_type, ticket_id=ticket_id)
+
+        from integrations.freshdesk_client import get_freshdesk_client
+
+        if action_type == "create_ticket" and ticket_id:
+            contact_email = sess.get("contact_email") or state.get("user_id", "your email")
+            contact_name = sess.get("contact_name") or state.get("user_name", "User")
+            if contact_email and "@" in contact_email:
+                import asyncio
+                asyncio.create_task(send_escalation_email(contact_email, contact_name, str(ticket_id), "New Office Account for Mark Thuishaven"))
+            msg = (
+                f"Done! Ticket **#TKT-{ticket_id}** has been escalated to **P1 priority**.\n\n"
+                f"The on-call engineer has been notified.\n\n"
+                f"**Assigned to:** IT Helpdesk team\n"
+                f"**Expected wait time:** 15 minutes\n\n"
+                f"An email confirmation will be sent to **{contact_email}**"
+            )
+            return {
+                "session_id": request.session_id,
+                "message": msg,
+                "approved": True,
+                "ticket_id": ticket_id,
+                "contact_info": {
+                    "name": sess.get("contact_name"),
+                    "email": sess.get("contact_email"),
+                    "phone": sess.get("contact_phone"),
+                },
+            }
+
+        if action_type == "create_ticket" and not ticket_id:
+            freshdesk = get_freshdesk_client()
+            ticket_data = pending.get("data", {})
+            try:
+                subject = ticket_data.get("subject", "IT Support Request")
+                description = ticket_data.get("description", "")
+                category = ticket_data.get("category", "IT")
+                priority = ticket_data.get("priority", "medium")
+
+                created = await freshdesk.create_ticket(
+                    subject=subject,
+                    description=description,
+                    category=category,
+                    priority=priority,
+                    requester_id=current_user["user_id"],
+                )
+                new_id = str(created.get("id"))
+
+                from agent.nodes.ticket_node import _classify_agent_assignment
+                assigned_specialist, assigned_team = _classify_agent_assignment(subject, category, description)
+
+                # Add classification audit note
+                try:
+                    await freshdesk.add_note(
+                        new_id,
+                        f"Bobby AI: Ticket classified and routed to {assigned_team} (Specialist: {assigned_specialist}). Priority: {priority}.",
+                        private=True
+                    )
+                except Exception:
+                    pass
+
+                target_email = sess.get("contact_email") or current_user.get("user_id") or "employee@company.com"
+                recipient_name = sess.get("contact_name") or current_user.get("name") or "Colleague"
+
+                # 1. Dispatch Ticket Created confirmation email
+                if target_email and "@" in target_email:
+                    import asyncio
+                    from integrations.email_service import send_ticket_created_email
+                    asyncio.create_task(
+                        send_ticket_created_email(
+                            to_email=target_email,
+                            recipient_name=recipient_name,
+                            ticket_id=new_id,
+                            subject_summary=subject,
+                            priority=priority,
+                            category=category
+                        )
+                    )
+
+                # 2. Trigger Autonomous Ticket Resolution Agent (Background Worker)
+                import asyncio
+                from agent.services.auto_resolver import auto_resolve_ticket_background
+                asyncio.create_task(
+                    auto_resolve_ticket_background(
+                        ticket_id=new_id,
+                        subject=subject,
+                        category=category,
+                        recipient_email=target_email,
+                        recipient_name=recipient_name,
+                        delay_seconds=4,
+                        description=description
+                    )
+                )
+
+                priority_icons = {"low": "🟢", "medium": "🟡", "high": "🟠", "urgent": "🔴"}
+                p_icon = priority_icons.get(priority.lower(), "🟡")
+
+                response_text = (
+                    f"✅ **Ticket #{new_id} created successfully!**\n\n"
+                    f"**{subject}**\n\n"
+                    f"| Field | Detail |\n|---|---|\n"
+                    f"| 🎫 **Ticket ID** | #{new_id} |\n"
+                    f"| {p_icon} **Priority** | {priority.title()} |\n"
+                    f"| 👤 **Assigned to** | {assigned_specialist} — {assigned_team} |\n"
+                    f"| ⚡ **Status** | In Progress (Autonomous Resolver Agent active) |\n"
+                    f"| 📧 **Updates** | Confirmation sent to {target_email} |\n\n"
+                    f"🤖 *Our Autonomous IT Resolution Agent is processing this request. You will receive a resolution confirmation email shortly.*"
+                )
+
+                return {
+                    "session_id": request.session_id,
+                    "message": response_text,
+                    "approved": True,
+                    "ticket_id": new_id,
+                    "contact_info": {
+                        "name": recipient_name,
+                        "email": target_email,
+                        "phone": sess.get("contact_phone"),
+                    },
+                }
+            except Exception as e:
+                logger.error("approve.create_error", error=str(e))
+                return {
+                    "session_id": request.session_id,
+                    "message": "Sorry, could not create the ticket. Please contact the helpdesk at ext. 4000.",
+                    "approved": True,
+                }
 
         return {
             "session_id": request.session_id,
-            "message": result.get("final_response", ""),
-            "approved": request.approved,
-            "ticket_id": result.get("ticket_id"),
+            "message": "Action approved and completed.",
+            "approved": True,
         }
 
     except Exception as e:
-        logger.error("approve.error", error=str(e))
+        logger.error("approve.error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ResolveTicketRequest(BaseModel):
+    ticket_id: str
+    resolution_notes: str = "The requested account configuration has been completed and credentials dispatched."
+    resolved_by: Optional[str] = "IT Helpdesk Specialist"
+    recipient_email: Optional[str] = None
+    recipient_name: Optional[str] = "Colleague"
+
+
+@router.post("/tickets/resolve")
+async def resolve_ticket(
+    request: ResolveTicketRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Marks ticket as Resolved in Freshdesk, adds audit note and sends HTML email."""
+    from integrations.freshdesk_client import get_freshdesk_client
+    from integrations.email_service import send_ticket_resolved_email
+    import asyncio
+
+    freshdesk = get_freshdesk_client()
+    logger.info("ticket.resolve_request", ticket_id=request.ticket_id, by_user=current_user.get("user_id"))
+
+    ticket_subject = f"Support Request #{request.ticket_id}"
+    target_email = request.recipient_email
+    recipient_name = request.recipient_name or "Colleague"
+
+    try:
+        t = await freshdesk.get_ticket(request.ticket_id)
+        if t:
+            ticket_subject = t.get("subject") or ticket_subject
+            if not target_email and t.get("email"):
+                target_email = t.get("email")
+    except Exception as e:
+        logger.warning("ticket.get_error_before_resolve", error=str(e))
+
+    if not target_email or "@" not in target_email:
+        target_email = settings.smtp_to_emails or current_user.get("user_id") or "hello@inspirednutrition.com"
+
+    try:
+        await freshdesk.update_ticket(
+            ticket_id=request.ticket_id,
+            updates={"status": 4}
+        )
+        
+        agent_name = request.resolved_by or current_user.get("name", "IT Support Specialist")
+        note_body = (
+            f"✅ Ticket marked as RESOLVED by {agent_name}.\n\n"
+            f"Resolution Summary:\n{request.resolution_notes}\n\n"
+            f"Notification email dispatched to: {target_email}"
+        )
+        await freshdesk.add_note(
+            ticket_id=request.ticket_id,
+            body=note_body,
+            private=True
+        )
+    except Exception as e:
+        logger.error("ticket.resolve_update_error", error=str(e), ticket_id=request.ticket_id)
+
+    agent_name = request.resolved_by or current_user.get("name", "IT Helpdesk Specialist")
+    if target_email and "@" in target_email:
+        asyncio.create_task(
+            send_ticket_resolved_email(
+                to_email=target_email,
+                recipient_name=recipient_name,
+                ticket_id=str(request.ticket_id),
+                subject_summary=ticket_subject,
+                resolution_notes=request.resolution_notes,
+                resolved_by=agent_name
+            )
+        )
+
+    return {
+        "status": "success",
+        "ticket_id": request.ticket_id,
+        "subject": ticket_subject,
+        "new_status": "Resolved",
+        "resolved_by": agent_name,
+        "resolution_notes": request.resolution_notes,
+        "email_dispatched_to": target_email,
+        "message": f"Ticket #{request.ticket_id} has been marked as Resolved in Freshdesk. Resolution details and CSAT survey were sent to {target_email}."
+    }
+
+

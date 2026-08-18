@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for settings dual-config (demo vs production).
 """
 import os

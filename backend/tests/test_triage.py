@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tests for Bobby triage node (intent classifier).
 Run with: pytest tests/ -v
 """

@@ -23,6 +23,12 @@ class TicketState(TypedDict):
     user_role: str          # "employee" | "helpdesk" | "admin"
     session_id: str         # maps to LangGraph thread_id
 
+    # ── Contact info collection (for ticket & email notifications) ────────────
+    contact_name: str | None        # full name provided by user in chat
+    contact_email: str | None       # email for ticket notifications
+    contact_phone: str | None       # phone/mobile number
+    contact_info_collected: bool    # True once all 3 fields are gathered
+
     # ── Triage output ─────────────────────────────────────────────────────────
     intent: str             # "it_question" | "create_ticket" | "ticket_status"
                             # | "account_unlock" | "password_reset" | "out_of_scope"

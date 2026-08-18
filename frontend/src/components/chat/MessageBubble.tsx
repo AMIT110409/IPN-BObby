@@ -6,7 +6,7 @@ import styles from './MessageBubble.module.css';
 interface Props { message: Message; }
 
 export default function MessageBubble({ message }: Props) {
-  const isUser   = message.sender === 'user';
+  const isUser = message.sender === 'user';
   const isSystem = message.sender === 'system';
 
   if (isSystem) {
@@ -26,10 +26,9 @@ export default function MessageBubble({ message }: Props) {
           <span className={styles.intentTag}>{message.intent.replace('_', ' ')}</span>
         )}
         <span className={styles.timestamp}>
-          {format(message.timestamp, 'HH:mm')}
+          {format(new Date(message.timestamp), 'HH:mm')}
         </span>
       </div>
-      {isUser && <div className={styles.avatar}>{message.sender[0].toUpperCase()}</div>}
     </div>
   );
 }

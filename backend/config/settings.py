@@ -1,5 +1,5 @@
 """
-Bobby — Settings (Multi-provider LLM + Dual DB Config)
+Bobby â€” Settings (Multi-provider LLM + Dual DB Config)
 ========================================================
 Usage:
   from config.settings import settings, LLMProvider
@@ -10,9 +10,9 @@ Usage:
   settings.is_demo               # True if APP_ENV=demo
 
 LLM_PROVIDER values:
-  claude       → Anthropic Claude (default)
-  openai       → OpenAI GPT
-  azure_openai → Azure OpenAI (production)
+  claude       â†’ Anthropic Claude (default)
+  openai       â†’ OpenAI GPT
+  azure_openai â†’ Azure OpenAI (production)
 """
 from __future__ import annotations
 from enum import Enum
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # ── App ───────────────────────────────────────────────────────────────────
+    # â”€â”€ App â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     app_env: AppEnv = AppEnv.DEMO
     app_name: str = "Bobby"
     api_host: str = "0.0.0.0"
@@ -47,59 +47,74 @@ class Settings(BaseSettings):
     api_secret_key: str = "change-me-in-production"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
-    # ── LLM Provider Selection ────────────────────────────────────────────────
+    # â”€â”€ LLM Provider Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Options: "claude" | "openai" | "azure_openai"
-    # Default: claude (Anthropic) — change in .env to switch provider
+    # Default: claude (Anthropic) â€” change in .env to switch provider
     llm_provider: LLMProvider = LLMProvider.CLAUDE
 
-    # ── Claude / Anthropic ───────────────────────────────────────────────────
+    # â”€â”€ Claude / Anthropic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-3-5-sonnet-20241022"   # latest Sonnet
 
-    # ── OpenAI (direct) ───────────────────────────────────────────────────────
+    # â”€â”€ OpenAI (direct) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     openai_api_key: str = ""   # also used as embedding fallback when provider=claude
     openai_model: str = "gpt-4o"
     openai_embedding_model: str = "text-embedding-3-small"
 
-    # ── Azure OpenAI ─────────────────────────────────────────────────────────
+    # â”€â”€ Azure OpenAI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""
     azure_openai_deployment: str = "gpt-4o"
     azure_openai_embedding_deployment: str = "text-embedding-3-large"
     azure_openai_api_version: str = "2024-02-01"
 
-    # ── Supabase (demo) ───────────────────────────────────────────────────────
+    # â”€â”€ Supabase (demo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
+    supabase_db_host: str = "db.tlohofzcstxogebrhmdr.supabase.co"
+    supabase_db_password: str = "ofiservices2026"
+    supabase_db_user: str = "postgres"
 
-    # ── Azure PostgreSQL (production) ─────────────────────────────────────────
+    # â”€â”€ Azure PostgreSQL (production) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     azure_postgres_host: str = ""
     azure_postgres_db: str = "bobby"
     azure_postgres_user: str = ""
     azure_postgres_password: str = ""
     azure_postgres_port: int = 5432
 
-    # ── Azure AI Search (production) ──────────────────────────────────────────
+    # â”€â”€ Azure AI Search (production) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     azure_search_endpoint: str = ""
     azure_search_api_key: str = ""
     azure_search_index_name: str = "bobby-knowledge"
 
-    # ── Freshdesk ─────────────────────────────────────────────────────────────
+    # â”€â”€ Freshdesk â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     freshdesk_api_key: str = ""
     freshdesk_domain: str = ""  # e.g. acme.freshdesk.com
 
-    # ── Microsoft Graph API ───────────────────────────────────────────────────
+    # ── SMTP Email Service ──────────────────────────────────────────────────
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_enabled: bool = True
+    smtp_user: str = ""
+    smtp_username: str = ""
+    smtp_to_emails: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "bobby-support@company.com"
+    smtp_from_name: str = "Bobby IT Support"
+    smtp_use_tls: bool = True  # e.g. acme.freshdesk.com
+
+    # â”€â”€ Microsoft Graph API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     graph_tenant_id: str = ""
     graph_client_id: str = ""
     graph_client_secret: str = ""
 
-    # ── Langfuse ──────────────────────────────────────────────────────────────
+    # â”€â”€ Langfuse â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
 
-    # ── Derived helpers ───────────────────────────────────────────────────────
+    # â”€â”€ Derived helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     @property
     def is_demo(self) -> bool:
         return self.app_env == AppEnv.DEMO
@@ -154,3 +169,6 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+

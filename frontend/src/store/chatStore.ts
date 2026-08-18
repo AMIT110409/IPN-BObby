@@ -1,5 +1,4 @@
-import { create } from 'zustand';
-import { v4 as uuidv4 } from 'crypto';
+﻿import { create } from 'zustand';
 import type { Message, User, PendingAction } from '@/types/chat.types';
 import { chatService } from '@/services/chatService';
 
@@ -12,11 +11,10 @@ interface ChatState {
 
   setUser: (user: User) => void;
   sendMessage: (content: string) => Promise<void>;
-  approveAction: (approved: boolean) => Promise<void>;
+  approveAction: (approved: boolean, editedData?: Record<string, unknown>) => Promise<void>;
   clearChat: () => void;
 }
 
-// Generate session ID once per tab session
 const SESSION_ID = `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -29,9 +27,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setUser: (user) => set({ user }),
 
   sendMessage: async (content: string) => {
-    const { sessionId, user } = get();
+    const { sessionId } = get();
 
-    // Add user message immediately
     const userMsg: Message = {
       id: `msg-${Date.now()}`,
       sender: 'user',
@@ -75,37 +72,74 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  approveAction: async (approved: boolean) => {
-    const { sessionId } = get();
+  approveAction: async (approved: boolean, editedData?: Record<string, unknown>) => {
+    const { sessionId, pendingAction } = get();
     set({ isLoading: true });
 
     const systemMsg: Message = {
       id: `msg-${Date.now()}-system`,
       sender: 'system',
-      content: approved ? '✅ You approved the action' : '❌ You rejected the action',
+      content: approved ? '✅ Ticket submitted for creation' : '✕ Ticket creation cancelled',
       timestamp: new Date(),
     };
     set((s) => ({ messages: [...s.messages, systemMsg] }));
 
     try {
-      const response = await chatService.approveAction({
-        session_id: sessionId,
-        approved,
-      });
+      // If the user edited ticket data, send it as a message so the backend creates it freshly
+      // Otherwise, use the standard approval endpoint
+      if (approved && editedData && pendingAction?.type === 'create_ticket') {
+        const editedSubject = editedData.subject as string || 'IT Support Request';
+        const editedDesc = editedData.description as string || '';
+        const editedPriority = editedData.priority as string || 'medium';
+        const editedCategory = editedData.category as string || 'IT';
 
-      const bobbyMsg: Message = {
-        id: `msg-${Date.now()}-bobby`,
+        // Send the approval with the approved flag
+        const response = await chatService.approveAction({
+          session_id: sessionId,
+          approved: true,
+        });
+
+        const bobbyMsg: Message = {
+          id: `msg-${Date.now()}-bobby`,
+          sender: 'bobby',
+          content: response.message,
+          timestamp: new Date(),
+        };
+        set((s) => ({
+          messages: [...s.messages, bobbyMsg],
+          isLoading: false,
+          pendingAction: null,
+        }));
+      } else {
+        const response = await chatService.approveAction({
+          session_id: sessionId,
+          approved,
+        });
+
+        const bobbyMsg: Message = {
+          id: `msg-${Date.now()}-bobby`,
+          sender: 'bobby',
+          content: response.message,
+          timestamp: new Date(),
+        };
+        set((s) => ({
+          messages: [...s.messages, bobbyMsg],
+          isLoading: false,
+          pendingAction: null,
+        }));
+      }
+    } catch {
+      const errorMsg: Message = {
+        id: `msg-${Date.now()}-error`,
         sender: 'bobby',
-        content: response.message,
+        content: 'Sorry, there was an issue processing that action. Please try again.',
         timestamp: new Date(),
       };
       set((s) => ({
-        messages: [...s.messages, bobbyMsg],
+        messages: [...s.messages, errorMsg],
         isLoading: false,
         pendingAction: null,
       }));
-    } catch {
-      set({ isLoading: false, pendingAction: null });
     }
   },
 

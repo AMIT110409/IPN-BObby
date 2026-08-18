@@ -1,48 +1,22 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  # ── FastAPI Backend ─────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      - APP_ENV=${APP_ENV:-demo}
     env_file:
-      - .env
-    volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    depends_on:
-      - postgres
+      - ./backend/.env
+    restart: always
 
-  # ── React Frontend ──────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000
-
-  # ── Local PostgreSQL (fallback if Supabase not available) ───────────────────
-  postgres:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_DB: bobby
-      POSTGRES_USER: bobby_user
-      POSTGRES_PASSWORD: bobby_local_pass
-    ports:
-      - "5432:5432"
-    volumes:
-      - bobby_pgdata:/var/lib/postgresql/data
-
-volumes:
-  bobby_pgdata:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always

@@ -1,80 +1,106 @@
 .row {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-  max-width: 80%;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 85%;
+  margin-bottom: 8px;
 }
 
-.rowUser  { align-self: flex-end; flex-direction: row-reverse; }
-.rowBobby { align-self: flex-start; }
+.rowUser {
+  align-self: flex-end;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.rowBobby {
+  align-self: flex-start;
+  margin-right: auto;
+}
 
 .avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #00473C;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-sm);
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+  margin-top: 2px;
+  box-shadow: 0 2px 5px rgba(0, 71, 60, 0.1);
 }
 
 .bubble {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.45;
   position: relative;
+  word-break: break-word;
 }
 
 .bubbleUser {
-  background: var(--color-primary);
-  color: white;
-  border-bottom-right-radius: var(--radius-sm);
+  background: #00473C;
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
 }
 
 .bubbleBobby {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
-  border-bottom-left-radius: var(--radius-sm);
+  background: #ffffff;
+  border: 1.5px solid #eae6db;
+  color: #1c2e2a;
+  border-bottom-left-radius: 4px;
 }
 
-.bubble p { margin: 0 0 var(--space-1); }
-.bubble p:last-of-type { margin-bottom: 0; }
-.bubble strong { color: var(--color-text-primary); }
-.bubble ul, .bubble ol { padding-left: var(--space-4); }
+.bubble p {
+  margin: 0 0 4px;
+}
+
+.bubble p:last-of-type {
+  margin-bottom: 0;
+}
+
+.bubble strong {
+  font-weight: 700;
+}
+
+.bubble ul, .bubble ol {
+  padding-left: 16px;
+  margin: 4px 0;
+}
 
 .intentTag {
   display: inline-block;
-  margin-top: var(--space-2);
+  margin-top: 6px;
   padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: 10px;
-  font-weight: 500;
+  border-radius: 99px;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border: 1px solid rgba(92, 110, 248, 0.25);
+  background: rgba(0, 71, 60, 0.08);
+  color: #00473C;
+  border: 1px solid rgba(0, 71, 60, 0.15);
 }
 
 .timestamp {
   display: block;
-  font-size: 10px;
-  color: var(--color-text-muted);
-  margin-top: var(--space-1);
+  font-size: 9px;
+  color: #a0aec0;
+  margin-top: 4px;
   text-align: right;
 }
 
 .system {
   align-self: center;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: var(--space-1) var(--space-3);
+  font-size: 11px;
+  color: #718096;
+  background: #ffffff;
+  border: 1px solid #eae6db;
+  border-radius: 12px;
+  padding: 4px 12px;
+  margin: 8px 0;
 }
