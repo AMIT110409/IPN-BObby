@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from typing import Optional
 from langchain_core.messages import HumanMessage
 from agent.graph import get_bobby_graph, build_bobby_graph
+from agent.nodes.triage import _BAD_INTENT_PATTERNS
+import re
 from middleware.auth import get_current_user
 from config.settings import settings
 
@@ -98,6 +100,41 @@ async def chat(
 
     msg = request.message.strip()
     msg_lower = msg.lower()
+
+    # Step 0: Strict ITSM Guardrail & Bad Intent Check (ALWAYS HIGHEST PRIORITY)
+    for pattern in _BAD_INTENT_PATTERNS:
+        if re.search(pattern, msg_lower, re.IGNORECASE):
+            # Reset any contact collection state
+            sess["collecting_contact"] = False
+            sess["pending_ticket_query"] = None
+            sess["awaiting_confirmation"] = False
+            
+            refusal_msg = (
+                "🛡️ **Out of Scope Request**\n\n"
+                "I am **Bobby**, the AI Service Management Assistant at Inspired Pet Nutrition, "
+                "dedicated strictly to **IT Systems and Workplace Technology Support**.\n\n"
+                "I cannot create tickets or assist with personal belongings, facility complaints, "
+                "lifestyle, or non-IT requests.\n\n"
+                "I am ready to help you with **ITSM cases only**, including:\n\n"
+                "• 🔑 **Account & Access:** Password resets, MFA token resets & domain unlocks\n"
+                "• 🌐 **Network & Connectivity:** Corporate VPN, Wi-Fi 802.1X & DNS issues\n"
+                "• 💻 **Workplace Hardware:** Laptops, 4K monitors, docking stations & accessories\n"
+                "• 📊 **Enterprise Software:** Microsoft 365, Teams, Outlook & Dynamics 365 ERP\n"
+                "• 🎫 **ITSM Ticketing:** Raising, tracking, and resolving IT service requests\n\n"
+                "👉 *Please provide your inquiry or concern related to our ITSM cases only.*"
+            )
+            return {
+                "session_id": request.session_id,
+                "message": refusal_msg,
+                "intent": "guardrail_refusal",
+                "escalated": False,
+                "contact_info": {
+                    "name": sess.get("contact_name"),
+                    "email": sess.get("contact_email"),
+                    "phone": sess.get("contact_phone"),
+                    "collected": False,
+                },
+            }
 
     # Phase 1: Awaiting confirmation
     if sess.get("awaiting_confirmation"):
