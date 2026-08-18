@@ -49,13 +49,14 @@ async def init_persistent_checkpointer():
             min_size=1,
             max_size=5,
             max_idle=10.0,
+            open=False,
             check=AsyncConnectionPool.check_connection,
             kwargs={"autocommit": True, "prepare_threshold": 0}
         )
-        await _pool.open()
+        await asyncio.wait_for(_pool.open(), timeout=4.0)
 
         checkpointer = AsyncPostgresSaver(_pool)
-        await checkpointer.setup()
+        await asyncio.wait_for(checkpointer.setup(), timeout=4.0)
         _checkpointer = checkpointer
         logger.info("graph.async_postgres_checkpointer_ready", host=db_host)
 
@@ -63,6 +64,12 @@ async def init_persistent_checkpointer():
         return _checkpointer
     except Exception as e:
         logger.warning("graph.checkpointer_fallback_memory", error=str(e))
+        if _pool is not None:
+            try:
+                await _pool.close(timeout=0.5)
+            except Exception:
+                pass
+            _pool = None
         _checkpointer = MemorySaver()
         _graph_instance = build_bobby_graph(checkpointer=_checkpointer)
         return _checkpointer
