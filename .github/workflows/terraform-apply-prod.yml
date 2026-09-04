@@ -1,0 +1,77 @@
+###############################################################################
+# terraform-apply-prod.yml
+# Trigger: Push to main branch (i.e., PR merged from dev → main)
+# Job: runs `terraform apply` for production.
+#      GitHub Environments "main" gate requires a manual reviewer to approve
+#      before the job actually runs (configure in GitHub repo Settings →
+#      Environments → main → Required reviewers).
+###############################################################################
+
+name: "Terraform Apply — production"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/terraform-apply-prod.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_VERSION: "1.9.5"
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID:        ${{ secrets.ARM_TENANT_ID }}
+  ARM_CLIENT_ID:        ${{ secrets.ARM_CLIENT_ID }}
+
+jobs:
+  apply-prod:
+    name: "Apply (production)"
+    runs-on: ubuntu-latest
+    # ⚠️  This environment has a Required Reviewer gate in GitHub Settings.
+    # The workflow PAUSES here until an approver clicks "Approve and deploy".
+    environment: main
+
+    defaults:
+      run:
+        working-directory: infrastructure/environments/main
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Azure login (OIDC)"
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: "Setup Terraform ${{ env.TF_VERSION }}"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: "Terraform Init"
+        run: terraform init -input=false
+
+      - name: "Terraform Plan (pre-apply safety check)"
+        run: |
+          terraform plan -no-color -input=false \
+            -var="tenant_id=${{ secrets.ARM_TENANT_ID }}" \
+            -var="deployer_principal_id=${{ secrets.ARM_DEPLOYER_OBJECT_ID }}"
+
+      - name: "Terraform Apply"
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var="tenant_id=${{ secrets.ARM_TENANT_ID }}" \
+            -var="deployer_principal_id=${{ secrets.ARM_DEPLOYER_OBJECT_ID }}"
+
+      - name: "Production deployment summary"
+        run: |
+          echo "### 🚀 Production deployed!" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          terraform output -raw app_fqdn 2>/dev/null && \
+            echo "App URL: https://$(terraform output -raw app_fqdn)" >> "$GITHUB_STEP_SUMMARY" || true

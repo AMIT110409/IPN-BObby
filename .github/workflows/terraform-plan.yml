@@ -1,0 +1,133 @@
+###############################################################################
+# terraform-plan.yml
+# Trigger: Every PR targeting main or dev
+# Job: runs `terraform plan` for the affected environment, posts results as
+#      a PR comment. Uses Azure OIDC — no long-lived secrets.
+###############################################################################
+
+name: "Terraform Plan"
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/terraform-*.yml"
+
+permissions:
+  id-token: write      # required for OIDC token exchange
+  contents: read
+  pull-requests: write # for posting plan output as a comment
+
+env:
+  TF_VERSION: "1.9.5"
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID:        ${{ secrets.ARM_TENANT_ID }}
+  ARM_CLIENT_ID:        ${{ secrets.ARM_CLIENT_ID }}
+  # No ARM_CLIENT_SECRET — auth is done via OIDC token
+
+jobs:
+  detect-env:
+    name: "Detect target environment"
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+    steps:
+      - id: env
+        run: |
+          if [[ "${{ github.base_ref }}" == "main" ]]; then
+            echo "environment=main" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+  plan:
+    name: "Plan (${{ needs.detect-env.outputs.environment }})"
+    needs: detect-env
+    runs-on: ubuntu-latest
+    environment: ${{ needs.detect-env.outputs.environment }}
+
+    defaults:
+      run:
+        working-directory: infrastructure/environments/${{ needs.detect-env.outputs.environment }}
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Azure login (OIDC)"
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: "Setup Terraform ${{ env.TF_VERSION }}"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: "Terraform fmt check"
+        run: terraform fmt -check -recursive ../../..
+
+      - name: "Terraform Init"
+        run: terraform init -input=false
+
+      - name: "Terraform Validate"
+        run: terraform validate
+
+      - name: "Terraform Plan"
+        id: plan
+        run: |
+          terraform plan -no-color -input=false \
+            -var="tenant_id=${{ secrets.ARM_TENANT_ID }}" \
+            -var="deployer_principal_id=${{ secrets.ARM_DEPLOYER_OBJECT_ID }}" \
+            -out=tfplan 2>&1 | tee plan.txt
+          echo "exitcode=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: "Post plan as PR comment"
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('infrastructure/environments/${{ needs.detect-env.outputs.environment }}/plan.txt', 'utf8');
+            const maxLen = 60000;
+            const truncated = plan.length > maxLen ? plan.slice(0, maxLen) + '\n\n...(truncated)' : plan;
+            const body = `## 🏗 Terraform Plan — \`${{ needs.detect-env.outputs.environment }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`hcl
+            ${truncated}
+            \`\`\`
+
+            </details>
+
+            **Exit code:** \`${{ steps.plan.outputs.exitcode }}\``;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('🏗 Terraform Plan'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: "Fail if plan errored"
+        if: steps.plan.outputs.exitcode == '1'
+        run: exit 1

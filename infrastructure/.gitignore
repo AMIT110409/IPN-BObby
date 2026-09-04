@@ -1,0 +1,22 @@
+# Terraform state files (NEVER commit these)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform lock files (commit .terraform.lock.hcl — DO commit it)
+.terraform/
+
+# Variable files that may contain secrets
+*.tfvars.local
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Sensitive generated files
+.terraform.tfplan

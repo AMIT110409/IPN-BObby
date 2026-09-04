@@ -1,0 +1,27 @@
+# CODEOWNERS — Bobby ITSM Chatbot
+# Defines who must review PRs that touch specific paths.
+# GitHub automatically requests reviews from these owners.
+#
+# Format: <path-pattern>  <@github-username or @org/team>
+# ⚠️  Replace @AMIT110409 and team names with your real GitHub handles/teams.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Global fallback — every PR needs at least one review from the project lead
+*                                      @AMIT110409
+
+# Infrastructure changes need infra team sign-off
+infrastructure/**                      @AMIT110409
+
+# GitHub Actions workflows — only trusted engineers can modify CI/CD
+.github/workflows/**                   @AMIT110409
+
+# Backend code — backend team must review
+bobby/backend/**                       @AMIT110409
+
+# Frontend code — frontend team must review
+bobby/frontend/**                      @AMIT110409
+
+# Security-sensitive files — always need explicit review
+bobby/backend/middleware/**            @AMIT110409
+bobby/backend/config/settings.py      @AMIT110409
+.env.example                           @AMIT110409

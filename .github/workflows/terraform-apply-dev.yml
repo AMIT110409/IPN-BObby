@@ -1,0 +1,65 @@
+###############################################################################
+# terraform-apply-dev.yml
+# Trigger: Push to dev branch (i.e., PR merged)
+# Job: runs `terraform apply` automatically for the dev environment.
+###############################################################################
+
+name: "Terraform Apply — dev"
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/terraform-apply-dev.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_VERSION: "1.9.5"
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID:        ${{ secrets.ARM_TENANT_ID }}
+  ARM_CLIENT_ID:        ${{ secrets.ARM_CLIENT_ID }}
+
+jobs:
+  apply-dev:
+    name: "Apply (dev)"
+    runs-on: ubuntu-latest
+    environment: dev
+
+    defaults:
+      run:
+        working-directory: infrastructure/environments/dev
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Azure login (OIDC)"
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: "Setup Terraform ${{ env.TF_VERSION }}"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: "Terraform Init"
+        run: terraform init -input=false
+
+      - name: "Terraform Apply"
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var="tenant_id=${{ secrets.ARM_TENANT_ID }}" \
+            -var="deployer_principal_id=${{ secrets.ARM_DEPLOYER_OBJECT_ID }}"
+
+      - name: "Output app URL"
+        run: |
+          echo "### ✅ Dev deployed!" >> "$GITHUB_STEP_SUMMARY"
+          terraform output -raw app_fqdn 2>/dev/null && \
+            echo "App URL: https://$(terraform output -raw app_fqdn)" >> "$GITHUB_STEP_SUMMARY" || true
