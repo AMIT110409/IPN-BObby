@@ -52,11 +52,30 @@ jobs:
       - name: "Terraform Init"
         run: terraform init -input=false
 
-      - name: "Terraform Apply"
+      - name: "Terraform Plan (safety check before apply)"
+        id: plan
         run: |
-          terraform apply -auto-approve -input=false \
+          terraform plan -no-color -input=false -detailed-exitcode \
             -var="tenant_id=${{ secrets.ARM_TENANT_ID }}" \
-            -var="deployer_principal_id=${{ secrets.ARM_DEPLOYER_OBJECT_ID }}"
+            -var="deployer_principal_id=${{ secrets.ARM_DEPLOYER_OBJECT_ID }}" \
+            -out=tfplan
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+        # Exit codes:
+        #   0 = no changes (apply will be skipped)
+        #   1 = plan errored (apply will not run)
+        #   2 = changes detected (apply will run)
+        continue-on-error: true
+
+      - name: "Fail if plan errored"
+        if: steps.plan.outputs.exitcode == '1'
+        run: |
+          echo "❌ Terraform plan failed — apply will NOT run."
+          exit 1
+
+      - name: "Terraform Apply"
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          terraform apply -auto-approve -input=false tfplan
 
       - name: "Output app URL"
         run: |
